@@ -1,11 +1,11 @@
 package com.template.flows
 
 import co.paralleluniverse.fibers.Suspendable
-import com.template.contracts.CarContract
-import com.template.states.CarState
+import com.template.contracts.GContract
+import com.template.states.GState
 import net.corda.core.contracts.Command
-import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.contracts.requireThat
+import net.corda.core.crypto.TransactionSignature
 import net.corda.core.flows.*
 import net.corda.core.identity.Party
 import net.corda.core.transactions.SignedTransaction
@@ -18,34 +18,34 @@ import net.corda.core.utilities.ProgressTracker
 @InitiatingFlow
 @StartableByRPC
 class CarIssueInitiator(
-        val owningBank: Party,
-        val holdingDealer: Party,
-        val manufacturer: Party,
-        val vin:String,
-        val licensePlateNumber: String,
-        val make: String,
-        val model: String,
-        val dealershipLocation: String
+        val name:String,
+        val p2: Party
 ) : FlowLogic<SignedTransaction>() {
+
+    companion object {
+//        object COLLECTING : ProgressTracker.Step("Collecting signatures from counterparties.")
+//        object VERIFYING : ProgressTracker.Step("Verifying collected signatures.")
+
+//        @JvmStatic
+//        fun tracker() = ProgressTracker(COLLECTING, VERIFYING)
+    }
     override val progressTracker = ProgressTracker()
 
     @Suspendable
     override fun call() : SignedTransaction {
         // Initiator flow logic goes here.
         val notary = serviceHub.networkMapCache.notaryIdentities.first()
-        val command = Command(CarContract.Commands.Issue(), listOf(owningBank, holdingDealer, manufacturer).map(Party::owningKey))
-        val carState = CarState(owningBank, holdingDealer, manufacturer, vin, licensePlateNumber, make, model, dealershipLocation, UniqueIdentifier())
+        val command = Command(GContract.Commands.New(), listOf(ourIdentity, p2).map(Party::owningKey))
+        val gState = GState(ourIdentity, p2, name)
 
         val transactionBuilder = TransactionBuilder(notary)
-                .addOutputState(carState, CarContract.ID)
+                .addOutputState(gState, GContract.ID)
                 .addCommand(command)
         transactionBuilder.verify(serviceHub)
         val transaction = serviceHub.signInitialTransaction(transactionBuilder)
 
-        val sessions = (carState.participants - ourIdentity)
-                .map { it as Party }
-                .map { initiateFlow(it) }
-        val collectSignaturesFlow = subFlow(CollectSignaturesFlow(transaction, sessions))
+        val sessions = listOf(initiateFlow(p2))
+        val collectSignaturesFlow: SignedTransaction = subFlow(CollectSignaturesFlow(transaction, sessions))
 
         return subFlow(FinalityFlow(collectSignaturesFlow, sessions))
     }
@@ -59,7 +59,7 @@ class CarIssueResponder(val counterpartySession: FlowSession) : FlowLogic<Signed
         val signedTransactionFlow = object : SignTransactionFlow(counterpartySession){
             override fun checkTransaction(stx: SignedTransaction) = requireThat {
                 val output = stx.tx.outputs.single().data
-                "The output must be a CarState" using (output is CarState)
+                "The output must be a ${GState::class.simpleName}" using (output is GState)
             }
         }
         val txWeJustSigned = subFlow(signedTransactionFlow)

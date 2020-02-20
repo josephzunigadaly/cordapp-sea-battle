@@ -1,0 +1,107 @@
+package com.template.contracts
+
+import com.sun.media.jfxmediaimpl.platform.gstreamer.GSTPlatform
+import com.template.states.GState
+import com.template.states.Position
+import net.corda.core.contracts.CommandData
+import net.corda.core.contracts.Contract
+import net.corda.core.contracts.requireSingleCommand
+import net.corda.core.contracts.requireThat
+import net.corda.core.transactions.LedgerTransaction
+
+// ************
+// * Contract *
+// ************
+class GContract : Contract {
+    companion object {
+        // Used to identify our contract when building a transaction.
+        val ID: String = GContract::class.qualifiedName!!
+    }
+
+    // A transaction is valid if the verify() function of the contract of all the transaction's input and output states
+    // does not throw an exception.
+    override fun verify(tx: LedgerTransaction) {
+        // Verification logic goes here.
+
+        val command = tx.commands.requireSingleCommand<Commands>().value
+
+        when (command){
+            is Commands.New -> requireThat {
+                "There should be no input state" using (tx.inputs.isEmpty())
+                "There should be only one output state" using (tx.outputs.count() == 1)
+                "The output state must be of type ${GState::class.simpleName}" using (tx.outputs[0].data is GState)
+                val gState = tx.outputs[0].data as GState
+                "The name must have length > 0" using (gState.name.isNotEmpty())
+                "The maxScore must be 18" using (gState.maxScore == 18)
+                "P1 and P2 must be different" using (gState.p1 != gState.p2)
+                "p1SetPos must be false" using (!gState.p1SetPos)
+                "p2SetPos must be false" using (!gState.p2SetPos)
+                "turn must be p1" using (gState.turn == gState.p1)
+            }
+            is Commands.P1SetPos -> requireThat {
+                "There should be one input state" using (tx.inputs.count() == 1)
+                "There should be 101 output states" using (tx.outputs.count() == 101)
+                "The input state must be of type ${GState::class.simpleName}" using (tx.inputs[0].state.data is GState)
+                "The first output state must be of type ${GState::class.simpleName}" using (tx.outputs[0].data is GState)
+                "The last 100 output states must be of type ${Position::class.simpleName}" using (tx.outputs.asSequence().drop(1).all { it.data is Position })
+                val gState = tx.inputs[0].state.data as GState
+                val positions = tx.outputs.asSequence().drop(1).map { it.data as Position }
+                "The number of set positions must match maxScore" using (positions.filter { it.containsShip }.count() == gState.maxScore)
+                "It is P1 turn" using (gState.turn == gState.p1)
+                "All positions belong to P1" using (positions.all { it.owner == gState.p1 && it.originallyOwnedBy == gState.p1 })
+                val outputGState = tx.outputs[0].data as GState
+                "The turn should move to P2" using (outputGState.turn == outputGState.p2)
+                "Positions are set for P1" using (outputGState.p1SetPos)
+            }
+            is Commands.P2SetPos -> requireThat {
+                "There should be one input state" using (tx.inputs.count() == 1)
+                "There should be 101 output states" using (tx.outputs.count() == 101)
+                "The input state must be of type ${GState::class.simpleName}" using (tx.inputs[0].state.data is GState)
+                "The first output state must be of type ${GState::class.simpleName}" using (tx.outputs[0].data is GState)
+                "The last 100 output states must be of type ${Position::class.simpleName}" using (tx.outputs.asSequence().drop(1).all { it.data is Position })
+                val gState = tx.inputs[0].state.data as GState
+                val positions = tx.outputs.asSequence().drop(1).map { it.data as Position }
+                "The number of set positions must match maxScore" using (positions.filter { it.containsShip }.count() == gState.maxScore)
+                "It is P2 turn" using (gState.turn == gState.p2)
+                "All positions belong to P2" using (positions.all { it.owner == gState.p2 && it.originallyOwnedBy == gState.p2 })
+                val outputGState = tx.outputs[0].data as GState
+                "The turn should move to P1" using (outputGState.turn == outputGState.p1)
+                "Positions are set for P2" using (outputGState.p2SetPos)
+            }
+            is Commands.P1Turn -> requireThat {
+                "" using (true)
+                "" using (true)
+                "" using (true)
+                "" using (true)
+                "" using (true)
+                "" using (true)
+                "" using (true)
+                "" using (true)
+                "" using (true)
+                "" using (true)
+            }
+            is Commands.P2Turn -> requireThat {
+                "" using (true)
+                "" using (true)
+                "" using (true)
+                "" using (true)
+                "" using (true)
+                "" using (true)
+                "" using (true)
+                "" using (true)
+                "" using (true)
+                "" using (true)
+
+            }
+        }
+    }
+
+    // Used to indicate the transaction's intent.
+    interface Commands : CommandData {
+        class New : Commands
+        class P1SetPos : Commands
+        class P2SetPos : Commands
+        class P1Turn : Commands
+        class P2Turn : Commands
+    }
+}
