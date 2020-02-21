@@ -69,16 +69,19 @@ class PrintGameInitiator(val gameName:String) : FlowLogic<Unit>() {
         // Print our grid
         println("Our grid")
         for (y in -1..9) {
-            val stringBuilder = StringBuilder()
-            if (y == -1) {
-                stringBuilder.append("  ")
-            } else {
-                stringBuilder.append("$y ")
-            }
             for (x in 'A'..'J') {
                 if (y == -1) {
-                    stringBuilder.append("$x")
+
+                    if (x == 'A'){
+                        print("  ")
+                    }
+                    print("$x")
                 } else {
+
+                    if (x == 'A'){
+                        print("$y ")
+                    }
+
                     val posName = "${x}${y}"
                     val position = ourPositions.single { it.positionName == posName }
                     if (position.owner != ourIdentity){
@@ -99,22 +102,25 @@ class PrintGameInitiator(val gameName:String) : FlowLogic<Unit>() {
                     }
                 }
             }
-            println(stringBuilder.toString())
+            println()
         }
 
         // Print their grid
         println("Their grid")
         for (y in -1..9) {
-            val stringBuilder = StringBuilder()
-            if (y == -1) {
-                stringBuilder.append("  ")
-            } else {
-                stringBuilder.append("$y ")
-            }
             for (x in 'A'..'J') {
                 if (y == -1) {
-                    stringBuilder.append("$x")
+                    if (x == 'A'){
+                        print("  ")
+                    }
+
+                    print("$x")
                 } else {
+
+                    if (x == 'A'){
+                        print("$y ")
+                    }
+
                     val posName = "${x}${y}"
                     val position = theirPositions.singleOrNull { it.positionName == posName }
                     if (position == null){
@@ -131,7 +137,7 @@ class PrintGameInitiator(val gameName:String) : FlowLogic<Unit>() {
                     }
                 }
             }
-            println(stringBuilder.toString())
+            println()
         }
     }
 }
