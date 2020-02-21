@@ -1,6 +1,6 @@
 package com.template
 
-import com.template.flows.CarIssueResponder
+import com.template.flows.NewGameResponder
 import net.corda.testing.node.MockNetwork
 import net.corda.testing.node.MockNetworkParameters
 import net.corda.testing.node.TestCordapp
@@ -18,7 +18,7 @@ class FlowTests {
 
     init {
         listOf(a, b).forEach {
-            it.registerInitiatedFlow(CarIssueResponder::class.java)
+            it.registerInitiatedFlow(NewGameResponder::class.java)
         }
     }
 

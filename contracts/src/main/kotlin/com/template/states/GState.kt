@@ -11,6 +11,7 @@ import net.corda.core.identity.Party
 // * State *
 // *********
 @BelongsToContract(GContract::class)
+
 data class GState(
         val p1: Party,
         val p2: Party,

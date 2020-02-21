@@ -5,7 +5,6 @@ import com.template.contracts.GContract
 import com.template.states.GState
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.requireThat
-import net.corda.core.crypto.TransactionSignature
 import net.corda.core.flows.*
 import net.corda.core.identity.Party
 import net.corda.core.transactions.SignedTransaction
@@ -17,7 +16,7 @@ import net.corda.core.utilities.ProgressTracker
 // *********
 @InitiatingFlow
 @StartableByRPC
-class CarIssueInitiator(
+class NewGameInitiator(
         val name:String,
         val p2: Party
 ) : FlowLogic<SignedTransaction>() {
@@ -51,8 +50,8 @@ class CarIssueInitiator(
     }
 }
 
-@InitiatedBy(CarIssueInitiator::class)
-class CarIssueResponder(val counterpartySession: FlowSession) : FlowLogic<SignedTransaction>() {
+@InitiatedBy(NewGameInitiator::class)
+class NewGameResponder(val counterpartySession: FlowSession) : FlowLogic<SignedTransaction>() {
     @Suspendable
     override fun call() : SignedTransaction{
         // Responder flow logic goes here.

@@ -68,6 +68,20 @@ class GContract : Contract {
                 "The turn should move to P1" using (outputGState.turn == outputGState.p1)
                 "Positions are set for P2" using (outputGState.p2SetPos)
             }
+            is Commands.SetPos -> requireThat {
+                "There should be one input state" using (tx.inputs.count() == 1)
+                "There should be 101 output states" using (tx.outputs.count() == 101)
+                "The input state must be of type ${GState::class.simpleName}" using (tx.inputs[0].state.data is GState)
+                "The first output state must be of type ${GState::class.simpleName}" using (tx.outputs[0].data is GState)
+                "The last 100 output states must be of type ${Position::class.simpleName}" using (tx.outputs.asSequence().drop(1).all { it.data is Position })
+                val gState = tx.inputs[0].state.data as GState
+                val positions = tx.outputs.asSequence().drop(1).map { it.data as Position }
+                "The number of set positions must match maxScore" using (positions.filter { it.containsShip }.count() == gState.maxScore)
+                "It is my turn" using (positions.all { it.owner == gState.turn && it.originallyOwnedBy == gState.turn })
+                val outputGState = tx.outputs[0].data as GState
+                "The turn should move to the next player" using (outputGState.turn != gState.turn)
+                "Positions are set for one player" using (outputGState.p1SetPos || outputGState.p2SetPos)
+            }
             is Commands.P1Turn -> requireThat {
                 "" using (true)
                 "" using (true)
@@ -99,6 +113,7 @@ class GContract : Contract {
     // Used to indicate the transaction's intent.
     interface Commands : CommandData {
         class New : Commands
+        class SetPos : Commands
         class P1SetPos : Commands
         class P2SetPos : Commands
         class P1Turn : Commands
