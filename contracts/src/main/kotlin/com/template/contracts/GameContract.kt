@@ -29,13 +29,13 @@ class GameContract : Contract {
                 "There should be no input state" using (tx.inputs.isEmpty())
                 "There should be only one output state" using (tx.outputs.count() == 1)
                 "The output state must be of type ${GameState::class.simpleName}" using (tx.outputs[0].data is GameState)
-                val gState = tx.outputs[0].data as GameState
-                "The name must have length > 0" using (gState.name.isNotEmpty())
-                "The maxScore must be 18" using (gState.maxScore == 18)
-                "P1 and P2 must be different" using (gState.p1 != gState.p2)
-                "p1SetPos must be false" using (!gState.p1SetPos)
-                "p2SetPos must be false" using (!gState.p2SetPos)
-                "turn must be p1" using (gState.turn == gState.p1)
+                val outputGameState = tx.outputs[0].data as GameState
+                "The name must have length > 0" using (outputGameState.name.isNotEmpty())
+                "The maxScore must be 18" using (outputGameState.maxScore == 18)
+                "P1 and P2 must be different" using (outputGameState.p1 != outputGameState.p2)
+                "p1SetPos must be false" using (!outputGameState.p1SetPos)
+                "p2SetPos must be false" using (!outputGameState.p2SetPos)
+                "turn must be p1" using (outputGameState.turn == outputGameState.p1)
             }
             is Commands.SetPos -> requireThat {
                 "There should be one input state" using (tx.inputs.count() == 1)
@@ -43,38 +43,32 @@ class GameContract : Contract {
                 "The input state must be of type ${GameState::class.simpleName}" using (tx.inputs[0].state.data is GameState)
                 "The first output state must be of type ${GameState::class.simpleName}" using (tx.outputs[0].data is GameState)
                 "The last 100 output states must be of type ${PositionState::class.simpleName}" using (tx.outputs.asSequence().drop(1).all { it.data is PositionState })
-                val gState = tx.inputs[0].state.data as GameState
-                val positions = tx.outputs.asSequence().drop(1).map { it.data as PositionState }
-                "The number of set positions must match maxScore" using (positions.filter { it.containsShip }.count() == gState.maxScore)
-                "It is my turn" using (positions.all { it.owner == gState.turn && it.originallyOwnedBy == gState.turn })
-                val outputGState = tx.outputs[0].data as GameState
-                "The turn should move to the next player" using (outputGState.turn != gState.turn)
-                "Positions are set for one player" using (outputGState.p1SetPos || outputGState.p2SetPos)
+                val inputGameState = tx.inputs[0].state.data as GameState
+                val outputPositions = tx.outputs.asSequence().drop(1).map { it.data as PositionState }
+                "The number of set positions must match maxScore" using (outputPositions.filter { it.containsShip }.count() == inputGameState.maxScore)
+                "It is my turn" using (outputPositions.all { it.owner == inputGameState.turn && it.originallyOwnedBy == inputGameState.turn })
+                val outputGameState = tx.outputs[0].data as GameState
+                "The turn should move to the next player" using (outputGameState.turn != inputGameState.turn)
+                "The next player should be P1 or P2" using (outputGameState.turn in setOf(inputGameState.p1, inputGameState.p2))
+                "Positions are set for one player" using (outputGameState.p1SetPos || outputGameState.p2SetPos)
             }
-            is Commands.P1Turn -> requireThat {
-                "" using (true)
-                "" using (true)
-                "" using (true)
-                "" using (true)
-                "" using (true)
-                "" using (true)
-                "" using (true)
-                "" using (true)
-                "" using (true)
-                "" using (true)
-            }
-            is Commands.P2Turn -> requireThat {
-                "" using (true)
-                "" using (true)
-                "" using (true)
-                "" using (true)
-                "" using (true)
-                "" using (true)
-                "" using (true)
-                "" using (true)
-                "" using (true)
-                "" using (true)
-
+            is Commands.Turn -> requireThat {
+                "There should be two input states" using (tx.inputs.count() == 2)
+                "There should be two output states" using (tx.outputs.count() == 2)
+                "The first input state must be of type ${GameState::class.simpleName}" using (tx.inputs[0].state.data is GameState)
+                "The second input state must be of type ${PositionState::class.simpleName}" using (tx.inputs[1].state.data is PositionState)
+                "The first output state must be of type ${GameState::class.simpleName}" using (tx.outputs[0].data is GameState)
+                "The second output state must be of type ${PositionState::class.simpleName}" using (tx.outputs[1].data is PositionState)
+                val inputGameState = tx.inputs[0].state.data as GameState
+                val inputPosition = tx.inputs[1].state.data as PositionState
+                val outputGameState = tx.outputs[0].data as GameState
+                val outputPosition = tx.outputs[1].data as PositionState
+                "It is my turn" using (inputGameState.turn == outputPosition.owner)
+                "The turn should move to the next player" using (outputGameState.turn != inputGameState.turn)
+                "The next player should be P1 or P2" using (outputGameState.turn in setOf(inputGameState.p1, inputGameState.p2))
+                "Ownership of position is being transferred" using (outputPosition.originallyOwnedBy != outputPosition.owner)
+                "Input Position is owned by the other player" using (inputPosition.owner != inputGameState.turn)
+                "Input Position has not been transferred before" using (inputPosition.owner == inputPosition.originallyOwnedBy)
             }
         }
     }
@@ -83,7 +77,6 @@ class GameContract : Contract {
     interface Commands : CommandData {
         class New : Commands
         class SetPos : Commands
-        class P1Turn : Commands
-        class P2Turn : Commands
+        class Turn : Commands
     }
 }
