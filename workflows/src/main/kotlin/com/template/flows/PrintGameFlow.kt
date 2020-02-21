@@ -56,10 +56,15 @@ class PrintGameInitiator(val gameName:String) : FlowLogic<Unit>() {
             }
         }
 
+        if (!game.p1SetPos || !game.p2SetPos){
+            // Exit early if either position is not set
+            return
+        }
+
         val gamePositionStates = serviceHub.vaultService.queryBy(PositionState::class.java).states.filter { it.state.data.gameName == gameName }
-//        val positions = gamePositionStates.map { it.state.data }
-        val ourPositions = gamePositionStates.filter { it.state.data.originallyOwnedBy == ourIdentity }
-        val theirPositions = gamePositionStates.filter { it.state.data.originallyOwnedBy != ourIdentity }
+        val positions = gamePositionStates.map { it.state.data }
+        val ourPositions = positions.filter { it.originallyOwnedBy == ourIdentity }
+        val theirPositions = positions.filter { it.originallyOwnedBy != ourIdentity }
 
         // Print our grid
         println("Our grid")
@@ -75,18 +80,18 @@ class PrintGameInitiator(val gameName:String) : FlowLogic<Unit>() {
                     stringBuilder.append("$x")
                 } else {
                     val posName = "${x}${y}"
-                    val position = ourPositions.single { it.state.data.positionName == posName }
-                    if (position.state.data.owner != ourIdentity){
+                    val position = ourPositions.single { it.positionName == posName }
+                    if (position.owner != ourIdentity){
                         // The other side have claimed this
                         // Did it contain anything?
-                        if (position.state.data.containsShip) {
+                        if (position.containsShip) {
                             print('X')
                         } else{
                             print('/')
                         }
                     } else {
                         // Still ours
-                        if (position.state.data.containsShip) {
+                        if (position.containsShip) {
                             print("*")
                         } else {
                             print(" ")
@@ -111,14 +116,14 @@ class PrintGameInitiator(val gameName:String) : FlowLogic<Unit>() {
                     stringBuilder.append("$x")
                 } else {
                     val posName = "${x}${y}"
-                    val position = theirPositions.singleOrNull { it.state.data.positionName == posName }
+                    val position = theirPositions.singleOrNull { it.positionName == posName }
                     if (position == null){
                         // We have not tried this position
                         print(" ")
-                    } else if (position.state.data.owner == ourIdentity){
+                    } else if (position.owner == ourIdentity){
                         // We have claimed this
                         // Did it contain anything?
-                        if (position.state.data.containsShip) {
+                        if (position.containsShip) {
                             print('X')
                         } else {
                             print('/')
@@ -128,8 +133,5 @@ class PrintGameInitiator(val gameName:String) : FlowLogic<Unit>() {
             }
             println(stringBuilder.toString())
         }
-
-
     }
-
 }
