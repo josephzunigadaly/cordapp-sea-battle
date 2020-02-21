@@ -57,7 +57,7 @@ class SetPosInitiator(
 
         // Empty grid
         val map = mutableMapOf<String, PositionState>()
-        for (x in 'A'..'I'){
+        for (x in 'A'..'J'){
             for (y in 0..9){
                 val pos = "${x}${y}"
                 map[pos] = PositionState(ourIdentity, gameName, pos, false)
@@ -65,8 +65,6 @@ class SetPosInitiator(
         }
 
         // Read ship locations and add to map
-        val regex = Regex.fromLiteral("([A-Ia-i])([0-8])([NESWnesw])")
-
         for ((ship, size) in listOf(
                 Pair(aircraftCarrier, 5),
                 Pair(battleship, 4),
@@ -76,18 +74,16 @@ class SetPosInitiator(
                 Pair(submarine1, 1),
                 Pair(submarine2, 1)
         )) {
-            val matchResult = regex.matchEntire(ship)!!
-
-            val col = matchResult.groups[0]!!.value[0].toUpperCase()
-            val row = Integer.parseInt(matchResult.groups[1]!!.value)
-            val direction = matchResult.groups[2]!!.value.toUpperCase()
+            val col = ship[0].toUpperCase()
+            val row = Integer.parseInt(ship[1].toString())
+            val direction = ship[2].toUpperCase()
 
             for (i in 0 until size){
                 val posName: String = when (direction){
-                    "N" -> "$col${row - i}"
-                    "E" -> "${(col + i)}$row"
-                    "S" -> "$col${row + i}"
-                    "W" -> "${(col - i)}$row"
+                    'N' -> "$col${row - i}"
+                    'E' -> "${(col + i)}$row"
+                    'S' -> "$col${row + i}"
+                    'W' -> "${(col - i)}$row"
                     else -> throw IllegalArgumentException("Direction needs to be one of N, E, S, W")
                 }
 

@@ -75,7 +75,7 @@ class PrintGameInitiator(val gameName:String) : FlowLogic<Unit>() {
             } else {
                 stringBuilder.append("$y ")
             }
-            for (x in 'A'..'I') {
+            for (x in 'A'..'J') {
                 if (y == -1) {
                     stringBuilder.append("$x")
                 } else {
@@ -111,7 +111,7 @@ class PrintGameInitiator(val gameName:String) : FlowLogic<Unit>() {
             } else {
                 stringBuilder.append("$y ")
             }
-            for (x in 'A'..'I') {
+            for (x in 'A'..'J') {
                 if (y == -1) {
                     stringBuilder.append("$x")
                 } else {
