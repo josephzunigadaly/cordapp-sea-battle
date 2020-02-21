@@ -5,6 +5,7 @@ import com.template.contracts.GameContract
 import com.template.states.GameState
 import com.template.states.PositionState
 import net.corda.core.contracts.Command
+import net.corda.core.contracts.CommandData
 import net.corda.core.contracts.requireThat
 import net.corda.core.flows.*
 import net.corda.core.identity.Party
@@ -43,9 +44,6 @@ class SetPosInitiator(
         val gameState = serviceHub.vaultService.queryBy(GameState::class.java).states.single { it.state.data.name == gameName }
         val game = gameState.state.data
 
-        // Initiator flow logic goes here.
-        val notary = serviceHub.networkMapCache.notaryIdentities.first()
-        val command = Command(GameContract.Commands.SetPos(), listOf(ourIdentity).map(Party::owningKey))
 
         // Build output game state
         val outputGameState: GameState
@@ -96,8 +94,10 @@ class SetPosInitiator(
         }
 
         // Build up the transaction
+        val notary = serviceHub.networkMapCache.notaryIdentities.first()
+        val setPosCommand = Command(GameContract.Commands.SetPos(), listOf(game.p1, game.p2).map(Party::owningKey))
         val transactionBuilder = TransactionBuilder(notary)
-                .addCommand(command)
+                .addCommand(setPosCommand)
                 .addInputState(gameState)
                 .addOutputState(outputGameState, GameContract.ID)
         for (p in map.values){

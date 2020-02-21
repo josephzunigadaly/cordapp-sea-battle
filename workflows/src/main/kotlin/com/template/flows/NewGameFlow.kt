@@ -31,7 +31,7 @@ class NewGameInitiator(
     override fun call() : SignedTransaction {
         // Initiator flow logic goes here.
         val notary = serviceHub.networkMapCache.notaryIdentities.first()
-        val command = Command(GameContract.Commands.New(), listOf(ourIdentity, p2).map(Party::owningKey))
+        val command = Command(GameContract.Commands.NewGame(), listOf(ourIdentity, p2).map(Party::owningKey))
         val gameState = GameState(ourIdentity, p2, name)
 
         progressTracker.currentStep = CHECKFOREXISTING

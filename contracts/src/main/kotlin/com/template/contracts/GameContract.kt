@@ -25,7 +25,7 @@ class GameContract : Contract {
         val command = tx.commands.requireSingleCommand<Commands>().value
 
         when (command){
-            is Commands.New -> requireThat {
+            is Commands.NewGame -> requireThat {
                 "There should be no input state" using (tx.inputs.isEmpty())
                 "There should be only one output state" using (tx.outputs.count() == 1)
                 "The output state must be of type ${GameState::class.simpleName}" using (tx.outputs[0].data is GameState)
@@ -36,6 +36,20 @@ class GameContract : Contract {
                 "p1SetPos must be false" using (!outputGameState.p1SetPos)
                 "p2SetPos must be false" using (!outputGameState.p2SetPos)
                 "turn must be p1" using (outputGameState.turn == outputGameState.p1)
+            }
+            is Commands.UpdateGame -> requireThat {
+                "There should be one input state" using (tx.inputs.count() == 1)
+                "There should be only one output state" using (tx.outputs.count() == 1)
+                "The input state must be of type ${GameState::class.simpleName}" using (tx.inputs[0].state.data is GameState)
+                "The output state must be of type ${GameState::class.simpleName}" using (tx.outputs[0].data is GameState)
+                val inputGameState = tx.inputs[0].state.data as GameState
+                val outputGameState = tx.outputs[0].data as GameState
+                "p1 must not change" using (inputGameState.p1 == outputGameState.p1)
+                "p2 must not change" using (inputGameState.p2 == outputGameState.p2)
+                "linearId must not change" using (inputGameState.linearId == outputGameState.linearId)
+                "maxScore must not change" using (inputGameState.maxScore == outputGameState.maxScore)
+                "name must not change" using (inputGameState.name == outputGameState.name)
+                "turn is one of p1 or p2" using (outputGameState.turn in setOf(outputGameState.p1, outputGameState.p2))
             }
             is Commands.SetPos -> requireThat {
                 "There should be one input state" using (tx.inputs.count() == 1)
@@ -75,7 +89,8 @@ class GameContract : Contract {
 
     // Used to indicate the transaction's intent.
     interface Commands : CommandData {
-        class New : Commands
+        class NewGame : Commands
+        class UpdateGame : Commands
         class SetPos : Commands
         class Turn : Commands
     }
