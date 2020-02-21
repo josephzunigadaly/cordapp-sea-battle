@@ -46,12 +46,12 @@ class SetPosInitiator(
 
 
         // Build output game state
-        val outputGameState: GameState
-        outputGameState = if (game.p1 == ourIdentity){
+        val outputGameState: GameState = if (game.p1 == ourIdentity){
             game.copy(p1SetPos = true, turn = game.p2)
         } else {
             game.copy(p2SetPos = true, turn = game.p1)
         }
+        var otherPlayer = outputGameState.turn
 
         // Empty grid
         val map = mutableMapOf<String, PositionState>()
@@ -105,7 +105,23 @@ class SetPosInitiator(
         }
         transactionBuilder.verify(serviceHub)
         val transaction = serviceHub.signInitialTransaction(transactionBuilder)
+        val sessionsToCollectFrom = listOf(initiateFlow(otherPlayer))
+        val collectSigs = subFlow(CollectSignaturesFlow(transaction, sessionsToCollectFrom))
+        return subFlow(FinalityFlow(collectSigs, sessionsToCollectFrom))
+    }
+}
 
-        return subFlow(FinalityFlow(transaction, emptyList()))
+@InitiatedBy(SetPosInitiator::class)
+class SetPosResponder(val counterpartySession: FlowSession) : FlowLogic<SignedTransaction>() {
+    @Suspendable
+    override fun call(): SignedTransaction {
+        val signedTransactionFlow = object : SignTransactionFlow(counterpartySession){
+            override fun checkTransaction(stx: SignedTransaction) = requireThat {
+//                val outputGameState = stx.tx.outputs.single().data
+//                "The output must be a ${GameState::class.simpleName}" using (outputGameState is GameState)
+            }
+        }
+        val txWeJustSigned = subFlow(signedTransactionFlow)
+        return subFlow(ReceiveFinalityFlow(counterpartySession, txWeJustSigned.id))
     }
 }
