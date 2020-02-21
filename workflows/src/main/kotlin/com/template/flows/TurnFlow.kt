@@ -8,6 +8,7 @@ import net.corda.core.contracts.Command
 import net.corda.core.contracts.requireThat
 import net.corda.core.flows.*
 import net.corda.core.identity.Party
+import net.corda.core.internal.signWithCert
 import net.corda.core.serialization.CordaSerializable
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
@@ -49,11 +50,14 @@ class TurnInitiator(
 
         progressTracker.currentStep = TRANSFERRING
 
-        transaction.verify(serviceHub)
-        requireThat { "Returned position is not the one we requested" using ((transaction.tx.outputStates[0] as PositionState).positionName == coordinate) }
-        serviceHub.addSignature(transaction)
+        requireThat { "Returned position is not the one we requested" using ((transaction.tx.outputStates[1] as PositionState).positionName == coordinate) }
+        val signedTransaction = serviceHub.addSignature(transaction)
+        signedTransaction.verify(serviceHub)
 
-        return subFlow(FinalityFlow(transaction, initiateFlow))
+        val notary = serviceHub.networkMapCache.notaryIdentities.first()
+
+//        return subFlow(FinalityFlow(signedTransaction, initiateFlow))
+        return subFlow(FinalityFlow(signedTransaction, emptyList()))
     }
 }
 
@@ -89,9 +93,11 @@ class TurnResponder(val counterpartySession: FlowSession) :FlowLogic<Unit>() {
         val command = Command(GameContract.Commands.Turn(), listOf(ourIdentity, otherPlayer).map(Party::owningKey))
 
         val transactionBuilder = TransactionBuilder(notary)
+                .addCommand(command)
+                .addInputState(gameState)
+                .addOutputState(game.copy(turn = ourIdentity))
                 .addInputState(desiredPos)
                 .addOutputState(newPosition, GameContract.ID)
-                .addCommand(command)
         transactionBuilder.verify(serviceHub)
         val transaction = serviceHub.signInitialTransaction(transactionBuilder)
 
