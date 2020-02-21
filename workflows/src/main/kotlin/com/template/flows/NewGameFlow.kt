@@ -22,23 +22,27 @@ class NewGameInitiator(
 ) : FlowLogic<SignedTransaction>() {
 
     companion object {
-//        object COLLECTING : ProgressTracker.Step("Collecting signatures from counterparties.")
-//        object VERIFYING : ProgressTracker.Step("Verifying collected signatures.")
-
-//        @JvmStatic
-//        fun tracker() = ProgressTracker(COLLECTING, VERIFYING)
+        object CHECKFOREXISTING : ProgressTracker.Step("Checking for existing games.")
+        object CREATING : ProgressTracker.Step("Building game state.")
     }
-    override val progressTracker = ProgressTracker()
+    override val progressTracker = ProgressTracker(CHECKFOREXISTING, CREATING)
 
     @Suspendable
     override fun call() : SignedTransaction {
         // Initiator flow logic goes here.
         val notary = serviceHub.networkMapCache.notaryIdentities.first()
         val command = Command(GameContract.Commands.New(), listOf(ourIdentity, p2).map(Party::owningKey))
-        val gState = GameState(ourIdentity, p2, name)
+        val gameState = GameState(ourIdentity, p2, name)
+
+        progressTracker.currentStep = CHECKFOREXISTING
+        requireThat {
+            "Game name should be unique" using !serviceHub.vaultService.queryBy(GameState::class.java).states.any { it.state.data.name == name }
+        }
+
+        progressTracker.currentStep = CREATING
 
         val transactionBuilder = TransactionBuilder(notary)
-                .addOutputState(gState, GameContract.ID)
+                .addOutputState(gameState, GameContract.ID)
                 .addCommand(command)
         transactionBuilder.verify(serviceHub)
         val transaction = serviceHub.signInitialTransaction(transactionBuilder)
@@ -57,8 +61,8 @@ class NewGameResponder(val counterpartySession: FlowSession) : FlowLogic<SignedT
         // Responder flow logic goes here.
         val signedTransactionFlow = object : SignTransactionFlow(counterpartySession){
             override fun checkTransaction(stx: SignedTransaction) = requireThat {
-                val output = stx.tx.outputs.single().data
-                "The output must be a ${GameState::class.simpleName}" using (output is GameState)
+                val outputGameState = stx.tx.outputs.single().data
+                "The output must be a ${GameState::class.simpleName}" using (outputGameState is GameState)
             }
         }
         val txWeJustSigned = subFlow(signedTransactionFlow)
