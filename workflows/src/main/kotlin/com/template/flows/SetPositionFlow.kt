@@ -1,15 +1,13 @@
 package com.template.flows
 
 import co.paralleluniverse.fibers.Suspendable
-import com.template.contracts.GContract
-import com.template.states.GState
-import com.template.states.Position
+import com.template.contracts.GameContract
+import com.template.states.GameState
+import com.template.states.PositionState
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.requireThat
 import net.corda.core.flows.*
 import net.corda.core.identity.Party
-import net.corda.core.node.services.vault.QueryCriteria
-import net.corda.core.node.services.vault.builder
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.ProgressTracker
@@ -42,27 +40,27 @@ class SetPosInitiator(
     @Suspendable
     override fun call() : SignedTransaction {
 
-        val gameState = serviceHub.vaultService.queryBy(GState::class.java).states.single { it.state.data.name == gameName }
+        val gameState = serviceHub.vaultService.queryBy(GameState::class.java).states.single { it.state.data.name == gameName }
         val game = gameState.state.data
 
         // Initiator flow logic goes here.
         val notary = serviceHub.networkMapCache.notaryIdentities.first()
-        val command = Command(GContract.Commands.SetPos(), listOf(ourIdentity).map(Party::owningKey))
+        val command = Command(GameContract.Commands.SetPos(), listOf(ourIdentity).map(Party::owningKey))
 
         // Build output game state
-        val outputGState: GState
-        outputGState = if (game.p1 == ourIdentity){
+        val outputGameState: GameState
+        outputGameState = if (game.p1 == ourIdentity){
             game.copy(p1SetPos = true, turn = game.p2)
         } else {
             game.copy(p2SetPos = true, turn = game.p1)
         }
 
         // Empty grid
-        val map = mutableMapOf<String, Position>()
+        val map = mutableMapOf<String, PositionState>()
         for (x in 'A'..'I'){
             for (y in 0..9){
                 val pos = "${x}${y}"
-                map[pos] = Position(ourIdentity, gameName, pos, false)
+                map[pos] = PositionState(ourIdentity, gameName, pos, false)
             }
         }
 
@@ -97,7 +95,7 @@ class SetPosInitiator(
                 requireThat { "Ship positioned outside grid" using (map.containsKey(posName)) }
 
                 // Update the map
-                map[posName] = Position(ourIdentity, gameName, posName, true)
+                map[posName] = PositionState(ourIdentity, gameName, posName, true)
             }
         }
 
@@ -105,9 +103,9 @@ class SetPosInitiator(
         val transactionBuilder = TransactionBuilder(notary)
                 .addCommand(command)
                 .addInputState(gameState)
-                .addOutputState(outputGState, GContract.ID)
+                .addOutputState(outputGameState, GameContract.ID)
         for (p in map.values){
-            transactionBuilder.addOutputState(p, GContract.ID)
+            transactionBuilder.addOutputState(p, GameContract.ID)
         }
         transactionBuilder.verify(serviceHub)
         val transaction = serviceHub.signInitialTransaction(transactionBuilder)

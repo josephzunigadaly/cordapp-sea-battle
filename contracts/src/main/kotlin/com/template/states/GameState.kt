@@ -1,6 +1,6 @@
 package com.template.states
 
-import com.template.contracts.GContract
+import com.template.contracts.GameContract
 import net.corda.core.contracts.BelongsToContract
 import net.corda.core.contracts.ContractState
 import net.corda.core.contracts.UniqueIdentifier
@@ -10,9 +10,9 @@ import net.corda.core.identity.Party
 // *********
 // * State *
 // *********
-@BelongsToContract(GContract::class)
+@BelongsToContract(GameContract::class)
 
-data class GState(
+data class GameState(
         val p1: Party,
         val p2: Party,
         val name:String,

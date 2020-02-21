@@ -1,8 +1,8 @@
 package com.template.flows
 
 import co.paralleluniverse.fibers.Suspendable
-import com.template.contracts.GContract
-import com.template.states.GState
+import com.template.contracts.GameContract
+import com.template.states.GameState
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.requireThat
 import net.corda.core.flows.*
@@ -34,11 +34,11 @@ class NewGameInitiator(
     override fun call() : SignedTransaction {
         // Initiator flow logic goes here.
         val notary = serviceHub.networkMapCache.notaryIdentities.first()
-        val command = Command(GContract.Commands.New(), listOf(ourIdentity, p2).map(Party::owningKey))
-        val gState = GState(ourIdentity, p2, name)
+        val command = Command(GameContract.Commands.New(), listOf(ourIdentity, p2).map(Party::owningKey))
+        val gState = GameState(ourIdentity, p2, name)
 
         val transactionBuilder = TransactionBuilder(notary)
-                .addOutputState(gState, GContract.ID)
+                .addOutputState(gState, GameContract.ID)
                 .addCommand(command)
         transactionBuilder.verify(serviceHub)
         val transaction = serviceHub.signInitialTransaction(transactionBuilder)
@@ -58,7 +58,7 @@ class NewGameResponder(val counterpartySession: FlowSession) : FlowLogic<SignedT
         val signedTransactionFlow = object : SignTransactionFlow(counterpartySession){
             override fun checkTransaction(stx: SignedTransaction) = requireThat {
                 val output = stx.tx.outputs.single().data
-                "The output must be a ${GState::class.simpleName}" using (output is GState)
+                "The output must be a ${GameState::class.simpleName}" using (output is GameState)
             }
         }
         val txWeJustSigned = subFlow(signedTransactionFlow)
