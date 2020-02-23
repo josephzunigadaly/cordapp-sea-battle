@@ -9,6 +9,8 @@ import net.corda.core.contracts.StateAndRef
 import net.corda.core.contracts.requireThat
 import net.corda.core.flows.*
 import net.corda.core.identity.Party
+import net.corda.core.node.services.Vault
+import net.corda.core.node.services.vault.QueryCriteria
 import net.corda.core.serialization.CordaSerializable
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
@@ -39,7 +41,7 @@ class TurnInitiator(
 
         progressTracker.currentStep = FINDING
 
-        val gameState = serviceHub.vaultService.queryBy(GameState::class.java).states.single { it.state.data.name == gameName }
+        val gameState = serviceHub.vaultService.queryBy(GameState::class.java, criteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)).states.single { it.state.data.name == gameName }
         val game = gameState.state.data
 
         val otherPlayer = if (game.p1 == ourIdentity) game.p2 else game.p1
@@ -83,9 +85,7 @@ class TurnInitiator2(
 
         val sessions = listOf(initiateFlow(otherPlayer))
         val collectSignaturesFlow = subFlow(CollectSignaturesFlow(transaction, sessions))
-
-        val initiateFlow = initiateFlow(otherPlayer)
-        return subFlow(FinalityFlow(collectSignaturesFlow, initiateFlow))
+        return subFlow(FinalityFlow(collectSignaturesFlow, sessions))
     }
 }
 
