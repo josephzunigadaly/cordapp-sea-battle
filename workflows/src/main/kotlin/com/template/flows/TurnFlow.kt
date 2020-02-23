@@ -5,15 +5,14 @@ import com.template.contracts.GameContract
 import com.template.states.GameState
 import com.template.states.PositionState
 import net.corda.core.contracts.Command
+import net.corda.core.contracts.StateAndRef
 import net.corda.core.contracts.requireThat
 import net.corda.core.flows.*
 import net.corda.core.identity.Party
-import net.corda.core.internal.signWithCert
 import net.corda.core.serialization.CordaSerializable
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.utilities.ProgressTracker
-import net.corda.core.utilities.UntrustworthyData
 import net.corda.core.utilities.unwrap
 
 @CordaSerializable
@@ -46,18 +45,59 @@ class TurnInitiator(
         val otherPlayer = if (game.p1 == ourIdentity) game.p2 else game.p1
 
         val initiateFlow = initiateFlow(otherPlayer)
-        val transaction = initiateFlow.sendAndReceive<SignedTransaction>(Params(gameName, coordinate)).unwrap{it}
+
+        val desiredPos = initiateFlow.sendAndReceive<StateAndRef<PositionState>>(Params(gameName, coordinate)).unwrap{it}
 
         progressTracker.currentStep = TRANSFERRING
 
-        requireThat { "Returned position is not the one we requested" using ((transaction.tx.outputStates[1] as PositionState).positionName == coordinate) }
-        val signedTransaction = serviceHub.addSignature(transaction)
-        signedTransaction.verify(serviceHub)
+        requireThat { "Returned position is not the one we requested" using (desiredPos.state.data.positionName == coordinate) }
 
+        return subFlow(TurnInitiator2(desiredPos, gameState, game, otherPlayer))
+    }
+}
+
+@InitiatingFlow
+class TurnInitiator2(
+        val desiredPos: StateAndRef<PositionState>,
+        val gameState: StateAndRef<GameState>,
+        val game: GameState,
+        val otherPlayer: Party
+) :FlowLogic<SignedTransaction>(){
+    @Suspendable
+    override fun call() : SignedTransaction {
+
+        // Crate transaction to record move
         val notary = serviceHub.networkMapCache.notaryIdentities.first()
+        val command = Command(GameContract.Commands.Turn(), listOf(ourIdentity, otherPlayer).map(Party::owningKey))
 
-//        return subFlow(FinalityFlow(signedTransaction, initiateFlow))
-        return subFlow(FinalityFlow(signedTransaction, emptyList()))
+        val newPosition = desiredPos.state.data.copy(owner = ourIdentity)
+
+        val transactionBuilder = TransactionBuilder(notary)
+                .addCommand(command)
+                .addInputState(gameState)
+                .addOutputState(game.copy(turn = otherPlayer))
+                .addInputState(desiredPos)
+                .addOutputState(newPosition, GameContract.ID)
+        transactionBuilder.verify(serviceHub)
+        val transaction = serviceHub.signInitialTransaction(transactionBuilder)
+
+        val sessions = listOf(initiateFlow(otherPlayer))
+        val collectSignaturesFlow = subFlow(CollectSignaturesFlow(transaction, sessions))
+
+        val initiateFlow = initiateFlow(otherPlayer)
+        return subFlow(FinalityFlow(collectSignaturesFlow, initiateFlow))
+    }
+}
+
+@InitiatedBy(TurnInitiator2::class)
+class TurnResponder2(val counterpartySession: FlowSession) :FlowLogic<SignedTransaction>() {
+    @Suspendable
+    override fun call(): SignedTransaction {        // Recieve collect signatures flow
+        val txWeJustSigned = subFlow(object : SignTransactionFlow(counterpartySession){
+            override fun checkTransaction(stx: SignedTransaction) = requireThat {
+            }
+        })
+        return subFlow(ReceiveFinalityFlow(counterpartySession, txWeJustSigned.id))
     }
 }
 
@@ -71,7 +111,7 @@ class TurnResponder(val counterpartySession: FlowSession) :FlowLogic<Unit>() {
     override val progressTracker = ProgressTracker(FINDING, TRANSFERRING)
 
     @Suspendable
-    override fun call() {
+    override fun call(): Unit {
         val receiveAll = receiveAll<Params>(Params::class.java, listOf(counterpartySession))
         val (gameName, coordinate) = receiveAll[0].unwrap { it }
 
@@ -84,24 +124,12 @@ class TurnResponder(val counterpartySession: FlowSession) :FlowLogic<Unit>() {
 
         val gamePositionStates = serviceHub.vaultService.queryBy(PositionState::class.java).states.filter { it.state.data.gameName == gameName }
         val ourPositions = gamePositionStates.filter { it.state.data.originallyOwnedBy == ourIdentity }
-        val desiredPos = ourPositions.single {it.state.data.positionName == coordinate}
+        val desiredPos: StateAndRef<PositionState> = ourPositions.single {it.state.data.positionName == coordinate}
 
         progressTracker.currentStep = TRANSFERRING
 
-        val newPosition = desiredPos.state.data.copy(owner = otherPlayer)
-        val notary = serviceHub.networkMapCache.notaryIdentities.first()
-        val command = Command(GameContract.Commands.Turn(), listOf(ourIdentity, otherPlayer).map(Party::owningKey))
-
-        val transactionBuilder = TransactionBuilder(notary)
-                .addCommand(command)
-                .addInputState(gameState)
-                .addOutputState(game.copy(turn = ourIdentity))
-                .addInputState(desiredPos)
-                .addOutputState(newPosition, GameContract.ID)
-        transactionBuilder.verify(serviceHub)
-        val transaction = serviceHub.signInitialTransaction(transactionBuilder)
-
-        counterpartySession.send(transaction)
+        // Send position to the other player
+        counterpartySession.send(desiredPos)
     }
-
 }
+
